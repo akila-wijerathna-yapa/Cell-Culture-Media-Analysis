@@ -4,6 +4,9 @@ library(tidyverse)
 library(pheatmap)
 library(vsn)
 library(patchwork)
+library(naniar)
+library(simputation)
+
 
 
 #---- Data Loading ----
@@ -279,16 +282,12 @@ pheatmap(missing_matrix,
 
 
 
-# Install and load naniar if not installed
-install.packages("naniar")
-library(naniar)
+# Missing value identification using library(naniar) 
 
 # Convert 0 values to NA in the dataset temporarily for missing data analysis
 df_temp <- df_filtered %>%
   mutate(across(everything(), ~ ifelse(. == 0, NA, .)))
 
-# Check for missing values
-library(naniar)
 vis_miss(df_temp, cluster = TRUE)  # Visualize clustered missing values
 
 # Upset plot for missing data combinations
@@ -319,7 +318,7 @@ ggplot(df_temp_long, aes(x = Value, fill = is.na(Value))) +
 
 ### This data looks like missing not at random (MNAR). Data imputation ----
 
-library(simputation)
+
 
 # Step 1: Convert 0s to NAs in the dataset (if 0 represents missing values)
 df_temp <- df_filtered %>%
@@ -388,13 +387,9 @@ ggplot(df_combined, aes(x = Log2_Area)) +
 ### Data Normalization ----
 ###########################
 
-# Load necessary libraries
-library(vsn)
-library(patchwork)
-
 # Step 1: Prepare data for visualization (before normalization)
 df_long_raw <- df_filtered_imputed %>%
-  pivot_longer(cols = -c(Average_Rt_min_, Metabolite_name), names_to = "Sample", values_to = "Area")
+  pivot_longer(cols = -c(Average.Rt.min., Metabolite.name), names_to = "Sample", values_to = "Area")
 
 # Step 2: Plot boxplot of raw data using log2 transformation
 plot_raw <- ggplot(df_long_raw, aes(x = log2(Area + 1), y = Sample)) +  # log2 transformation for visualization
@@ -403,17 +398,17 @@ plot_raw <- ggplot(df_long_raw, aes(x = log2(Area + 1), y = Sample)) +  # log2 t
   labs(title = "Boxplot of Metabolite Areas (Before Normalization)", y = "Sample", x = "Log2(Area + 1)")
 
 # Step 3: Apply VSN normalization on df_filtered_imputed
-# Ensure the selection excludes Average_Rt_min_ and Metabolite_name columns
-data_matrix <- as.matrix(df_filtered_imputed %>% select(-Average_Rt_min_, -Metabolite_name))
+# Ensure the selection excludes Average_Rt_min_ and Metabolite.name columns
+data_matrix <- as.matrix(df_filtered_imputed %>% select(-Average.Rt.min., -Metabolite.name))
 vsn_normalized <- vsn::vsn2(data_matrix)
 
 # Extract normalized data
 normalized_data <- as.data.frame(exprs(vsn_normalized))
-normalized_data$Metabolite_name <- df_filtered_imputed$Metabolite_name  # Add back Metabolite names for plotting
+normalized_data$Metabolite.name <- df_filtered_imputed$Metabolite.name  # Add back Metabolite names for plotting
 
 # Step 4: Convert normalized data to long format for plotting
 df_long_normalized <- normalized_data %>%
-  pivot_longer(cols = -Metabolite_name, names_to = "Sample", values_to = "Area")
+  pivot_longer(cols = -Metabolite.name, names_to = "Sample", values_to = "Area")
 
 # Plot boxplot of normalized data
 plot_normalized <- ggplot(df_long_normalized, aes(x = Area, y = Sample)) +
@@ -434,7 +429,7 @@ print(combined_plot)
 
 # Step 1: Select sample columns (excluding metadata) for PCA
 df_pca_data <- df_filtered_imputed %>%
-  select(-Average_Rt_min_, -Metabolite_name) %>%
+  select(-Average.Rt.min., -Metabolite.name) %>%
   t() %>%
   as.data.frame()
 
@@ -473,7 +468,7 @@ ggplot(pca_data, aes(x = PC1, y = PC2, color = Group, label = Sample)) +
 
 # Step 6: Prepare the imputed data for visualization (before normalization)
 df_long_raw <- df_filtered_imputed %>%
-  pivot_longer(cols = -c(Average_Rt_min_, Metabolite_name), names_to = "Sample", values_to = "Area")
+  pivot_longer(cols = -c(Average.Rt.min., Metabolite.name), names_to = "Sample", values_to = "Area")
 
 # Step 7: Plot boxplot of raw data using log2 transformation
 plot_raw <- ggplot(df_long_raw, aes(x = log2(Area + 1), y = Sample)) +  # log2 transformation for visualization
@@ -482,14 +477,14 @@ plot_raw <- ggplot(df_long_raw, aes(x = log2(Area + 1), y = Sample)) +  # log2 t
   labs(title = "Boxplot of Metabolite Areas (Before Normalization)", y = "Sample", x = "Log2(Area + 1)")
 
 # Step 8: Apply VSN normalization on df_filtered_imputed
-data_matrix <- as.matrix(df_filtered_imputed %>% select(-Average_Rt_min_, -Metabolite_name))
+data_matrix <- as.matrix(df_filtered_imputed %>% select(-Average.Rt.min., -Metabolite.name))
 vsn_normalized <- vsn::vsn2(data_matrix)
 
 # Extract normalized data and convert it for plotting
 normalized_data <- as.data.frame(exprs(vsn_normalized))
-normalized_data$Metabolite_name <- df_filtered_imputed$Metabolite_name
+normalized_data$Metabolite.name <- df_filtered_imputed$Metabolite.name
 df_long_normalized <- normalized_data %>%
-  pivot_longer(cols = -Metabolite_name, names_to = "Sample", values_to = "Area")
+  pivot_longer(cols = -Metabolite.name, names_to = "Sample", values_to = "Area")
 
 # Step 9: Plot boxplot of normalized data
 plot_normalized <- ggplot(df_long_normalized, aes(x = Area, y = Sample)) +
@@ -506,7 +501,7 @@ print(combined_plot)
 
 # Convert normalized data to long format for ggplot2
 df_long_normalized <- normalized_data %>%
-  pivot_longer(cols = -Metabolite_name, names_to = "Sample", values_to = "Area")
+  pivot_longer(cols = -Metabolite.name, names_to = "Sample", values_to = "Area")
 
 # Plot the box plot with log-transformed data
 ggplot(df_long_normalized, aes(x = Sample, y = log2(Area))) +
@@ -537,7 +532,7 @@ blank_thresholds <- normalized_data %>%
 
 # Transform normalized_data to long format and flag values above Q3
 df_normalized_data_long <- normalized_data %>%
-  pivot_longer(cols = -Metabolite_name, names_to = "Samples", values_to = "Area") %>%
+  pivot_longer(cols = -Metabolite.name, names_to = "Samples", values_to = "Area") %>%
   mutate(flag = case_when(
     Samples == "Blank_1" & Area > blank_thresholds$Blank_1 ~ "Above Q3",
     Samples == "Blank_2" & Area > blank_thresholds$Blank_2 ~ "Above Q3",
@@ -563,17 +558,17 @@ geom_boxplot(outlier.shape = NA) +
 below_Q3_metabolites <- normalized_data %>%
   rowwise() %>%
   filter(all(c_across(all_of(blank_columns)) <= blank_thresholds)) %>%
-  pull(Metabolite_name)
+  pull(Metabolite.name)
 
 # Filter data to keep only below Q3 metabolites
 df_below_Q3 <- normalized_data %>%
-  filter(Metabolite_name %in% below_Q3_metabolites)
+  filter(Metabolite.name %in% below_Q3_metabolites)
 
 
 # Step 5. Create New PCA with df_below_Q3
 # Prepare data for PCA by selecting sample columns
 df_pca_data <- df_below_Q3 %>%
-  select(-Metabolite_name) %>%
+  select(-Metabolite.name) %>%
   t() %>%
   as.data.frame()
 
@@ -758,12 +753,12 @@ df_with_blank_avg <- df_below_Q3 %>%
   mutate(Average_Blank = mean(c_across(starts_with("Blank_")), na.rm = TRUE))
 
 # Step 2: Define sample columns, excluding `Pool_1`, `Pool_2`, and all `Blank` columns
-sample_columns <- setdiff(names(df_below_Q3), c("Metabolite_name", "Blank_1", "Blank_2", "Blank_3", "Blank_4", "Pool_1", "Pool_2"))
+sample_columns <- setdiff(names(df_below_Q3), c("Metabolite.name", "Blank_1", "Blank_2", "Blank_3", "Blank_4", "Pool_1", "Pool_2"))
 
 # Step 3: Subtract the average blank value from each sample column to remove background noise
 df_clean_to_stat <- df_with_blank_avg %>%
   mutate(across(all_of(sample_columns), ~ . - Average_Blank)) %>%
-  select(Metabolite_name, all_of(sample_columns))  # Keep only the relevant columns for downstream analysis
+  select(Metabolite.name, all_of(sample_columns))  # Keep only the relevant columns for downstream analysis
 
 # View the resulting dataframe
 str(df_clean_to_stat)
@@ -775,25 +770,25 @@ str(df_clean_to_stat)
 
 # Step 1: Clean `Metabolite.name` by removing extra information after ";"
 df_clean_to_stat_v1 <- df_clean_to_stat %>%
-  mutate(Metabolite_name = str_remove(Metabolite_name, ";.*"))
+  mutate(Metabolite.name = str_remove(Metabolite.name, ";.*"))
 
 # Step 2: Group by the cleaned `Metabolite.name` and calculate the average for each unique metabolite
 df_clean_to_stat_v1 <- df_clean_to_stat_v1 %>%
-  group_by(Metabolite_name) %>%
+  group_by(Metabolite.name) %>%
   summarise(across(everything(), mean, na.rm = TRUE)) %>%
   ungroup()
 
 # Step 3: Reshape to long format for averaging replicates without duplicate column names
 df_clean_to_stat_v1_long <- df_clean_to_stat_v1 %>%
-  pivot_longer(cols = -Metabolite_name, names_to = "Sample", values_to = "Value")
+  pivot_longer(cols = -Metabolite.name, names_to = "Sample", values_to = "Value")
 
 # Step 4: Extract base sample names by removing replicate suffixes
 df_clean_to_stat_v1_long <- df_clean_to_stat_v1_long %>%
   mutate(Base_Sample = str_remove(Sample, "_\\d+$"))
 
-# Step 5: Group by `Metabolite_name` and `Base_Sample`, then calculate the average for each base sample
+# Step 5: Group by `Metabolite.name` and `Base_Sample`, then calculate the average for each base sample
 df_clean_to_stat_v2 <- df_clean_to_stat_v1_long %>%
-  group_by(Metabolite_name, Base_Sample) %>%
+  group_by(Metabolite.name, Base_Sample) %>%
   summarise(Average_Value = mean(Value, na.rm = TRUE), .groups = "drop")
 
 # Step 6: Pivot back to wide format to get a final data frame with averaged values for each base sample
@@ -806,11 +801,11 @@ str(df_clean_to_stat_v2)
 # Step 7: Prepare data for heatmap plotting
 # Truncate Metabolite.name to the first 30 characters for readability
 df_clean_to_stat_v2 <- df_clean_to_stat_v2 %>%
-  mutate(Metabolite_name = str_sub(Metabolite_name, 1, 30))
+  mutate(Metabolite.name = str_sub(Metabolite.name, 1, 30))
 
 # Convert to matrix format for heatmap
 heatmap_matrix <- df_clean_to_stat_v2 %>%
-  column_to_rownames(var = "Metabolite_name") %>%
+  column_to_rownames(var = "Metabolite.name") %>%
   as.matrix()
 
 # Step 8: Plot the heatmap
@@ -839,7 +834,7 @@ pheatmap(heatmap_matrix,
 dev.off()  # Close the PDF device
 
 # Save heatmap as a high-resolution JPEG
-jpeg("Heatmap_Metabolite_Data.jpg", width = 1200, height = 1000, res = 300)  # Set high resolution with res = 300
+jpeg("Heatmap_Metabolite_Data.jpeg", width = 1200, height = 1000, res = 300)  # Set high resolution with res = 300
 pheatmap(heatmap_matrix,
          scale = "row",  # Normalize each row for better visualization
          clustering_distance_rows = "euclidean",
