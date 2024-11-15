@@ -1,10 +1,10 @@
 # Raw Mass Spectrometry data can be access from Zenodeo repository
 
-# Mass Spectrometry proteomics sample processing protocol can be access from
 
-https://github.com/bmsCoreFacility/methodText/blob/main/requests/1137/metabolomics_targetedQtrap.md
+# Mass Spectrometry proteomics sample processing protocol and data acquisition protocol can be access from
 
-# Mass Spectrometry proteomics data acquisition protocol can be access from
+https://www.protocols.io/view/liquid-chromatography-mass-spectrometry-lc-ms-base-drsh56b6
+
 
 
 # Mass Spectrometry data analysis processing protocol can be access from protocols.io
