@@ -1,16 +1,20 @@
-#---- Libraries Loading ----
+################################################################################
+#Libraries Loading ----
 
 library(tidyverse)
 library(pheatmap)
-library(vsn)
+# library(vsn)
 library(patchwork)
-library(naniar)
-library(simputation)
-library(missForest)
+# library(naniar)
+# library(simputation)
+# library(missForest)
+library(KODAMA)
+library(viridis)
+library(ggrepel)
 
 
-
-#---- Data Loading ----
+################################################################################
+#Data Loading ----
 
 df_pos <- read.csv("Data/POS_Height_1_2024_09_24_05_19_14.csv", stringsAsFactors = FALSE)
 
@@ -145,10 +149,8 @@ ggplot(pca_data, aes(x = PC1, y = PC2, color = Group, label = Sample)) +
 
 
 
-################################
+################################################################################
 ### Missing values ----
-################################
-
 
 #### Missing vlues % ----
 
@@ -168,7 +170,7 @@ ggplot(missing_percentage, aes(x = Sample, y = Missing_Percentage)) +
        y = "Missing Value Percentage (%)")
 
 
-################ ----
+################################################################################
 # Step 1: Identify sample columns and separate group names from replicate numbers
 
 # Define the sample columns (exclude metadata columns like "Average.Rt.min." and "Metabolite.name")
@@ -266,18 +268,6 @@ vis_miss(df_temp, cluster = TRUE)  # Visualize clustered missing values
 gg_miss_upset(df_temp)
 
 
-
-# Group-wise missingness summary
-missing_summary <- df_temp %>%
-  pivot_longer(cols = -c(Average.Rt.min., Metabolite.name), names_to = "Sample", values_to = "Value") %>%
-  mutate(Type = case_when(
-    grepl("Blank", Sample) ~ "Blank",
-    grepl("Pool", Sample) ~ "Pool",
-    TRUE ~ "Sample"
-  )) %>%
-  group_by(Type, Sample) %>%
-  summarise(Missing_Percentage = mean(is.na(Value)) * 100, .groups = "drop")
-
 # Plot missingness percentages by groups
 ggplot(missing_summary, aes(x = Sample, y = Missing_Percentage, fill = Type)) +
   geom_bar(stat = "identity", position = "dodge") +
@@ -299,15 +289,11 @@ missing_summary <- df_run_selected %>%
 # Display the summary of missing values
 print(missing_summary)
 
-# "0 " indicates a true biological absence (e.g., a metabolite is genuinely undetectable in a sample), these values should remain as 0.
-# Keeping 0 preserves the biological meaning of "no signal" or "no presence."
-# Hence downstream analysis should consider 0 as a meaningful observation rather than missing data.
 
 
-###########################################################
-### Let's try this withour Missing value imputation ----
+################################################################################
 # DDA; these are random observation; not everything was quantified
-##########################################################
+################################################################################
 
 # If blanks have high intensities for certain metabolites, subtracting them first avoids propagating those effects through normalization.
 # When using scaling techniques (e.g., Pareto scaling or mean centering) for multivariate analysis (e.g., PCA), it is usually better to subtract blanks first.
@@ -341,7 +327,7 @@ df_blank_corrected <- df_with_blank_avg %>%
   mutate(across(all_of(sample_columns), ~ ifelse((. - Average_Blank) < 0, 0, . - Average_Blank))) %>%
   select(-starts_with("Blank_"), -starts_with("Pool_"), -Average_Blank)  # Drop Blank, Pool, and Average_Blank columns
 
-################################
+################################################################################
 # Check for any negative values across numeric columns
 any_negative <- any(df_blank_corrected %>% 
                       select(where(is.numeric)) %>% 
@@ -353,7 +339,7 @@ if (any_negative) {
 } else {
   print("No negative values found in the dataframe.")
 }
-#####################################
+################################################################################
 
 # Identify metabolites with >20% zero values in samples
 metabolites_to_keep <- df_blank_corrected %>%
@@ -368,7 +354,7 @@ df_filtered_80 <- df_blank_corrected %>%
   select(Metabolite.name, Average.Rt.min., all_of(metabolites_to_keep))
 
 
-####################################
+################################################################################
 ## Visualize missing values
 # Prepare the dataset for heatmap
 # Remove metadata columns (Metabolite.name, Average.Rt.min.)
@@ -398,108 +384,104 @@ pheatmap(
 
 
 
-################################################
+################################################################################
+
+# Follow the recent protocol: Pakkir Shah, Abzer K., et al. "Statistical analysis of feature-based molecular networking results from non-targeted metabolomics data." Nature protocols (2024): 1-71. https://www.nature.com/articles/s41596-024-01046-3
 
 # Many feature extraction software programs, such as MZmine 3, often generate tables with missing values denoted as ‘NA’, ‘NaN’ or 0. This means that for several m/z and RT traces in a given sample, there may not be a peak detected and therefore no value is available. However, many statistical approaches, such as PCA, require numerical values for each observation. Hence, these features with missing values need to be removed or imputed. In this section, we handle the zero values in our blank-removed feature quantification table. https://www.nature.com/articles/s41596-024-01046-3
 
 # To handle log transformation when dataset contains zeros, we can use one of the following approaches to avoid undefined values (since log ⁡ ( 0 ) log(0) is undefined):
 
-# Approach 1: Add a Small Constant Before Log Transformation
-# Add a small constant (𝑘) to all values, ensuring no zeros remain.
-# k is typically chosen as a fraction of the smallest non-zero value in the dataset to minimize distortion.
 
-# # Identify the smallest non-zero value in the dataset
-# min_nonzero <- df_filtered_80 %>%
-#   select(-Metabolite.name, -Average.Rt.min.) %>%
-#   unlist() %>%
-#   .[. > 0] %>%
-#   min(na.rm = TRUE)
-# 
-# # Add a small constant (e.g., 10% of the smallest non-zero value)
-# k <- min_nonzero * 0.1
-# 
-# # Apply log transformation with the constant
-# df_log_transformed <- df_blank_corrected %>%
-#   mutate(across(where(is.numeric), ~ log(. + k)))
-# 
-# # 2. Histogram of Log-Transformed Values
-# 
-# # Convert data to long format for easier visualization
-# df_long_log <- df_log_transformed %>%
-#   pivot_longer(cols = -c(Metabolite.name, Average.Rt.min.), names_to = "Sample", values_to = "Log_Area")
-# 
-# # Plot histogram of log-transformed values
-# ggplot(df_long_log, aes(x = Log_Area)) +
-#   geom_histogram(bins = 50, fill = "skyblue", color = "black") +
-#   labs(title = "Distribution of Log-Transformed Metabolite Areas",
-#        x = "Log(Area + k)", y = "Frequency") +
-#   theme_minimal()
+# Step 1: Identify the second smallest non-zero value
+# Flatten all numeric data, filter out zeros, and get the second smallest value
+non_zero_values <- df_filtered_80 %>%
+  select(where(is.numeric)) %>% 
+  unlist() %>%
+  .[. > 0] %>%           # Keep only non-zero values
+  sort()
+
+second_min_value <- unique(non_zero_values)[2]  # The second smallest non-zero value
+
+# Print the second smallest non-zero value
+print(paste("The second smallest non-zero value is:", second_min_value))
+
+# Step 2: Replace zeros with random values between 1 and the second smallest non-zero value
+set.seed(141222)  # Set seed for reproducibility
+
+df_zero_imputed <- df_filtered_80 %>%
+  mutate(across(where(is.numeric), ~ ifelse(. == 0, 
+                                            runif(1, min = 1, max = second_min_value), .)))
+
+# Step 3: Verify the replacement of zeros
+# Count zeros before and after imputation
+zeros_before <- sum(df_filtered_80 == 0, na.rm = TRUE)
+zeros_after <- sum(df_zero_imputed == 0, na.rm = TRUE)
+
+print(paste("Number of zeros before imputation:", zeros_before))
+print(paste("Number of zeros after imputation:", zeros_after))
 
 
+################################################################################
+# Normalization
 
-# Extract numeric data (excluding metadata columns)
-data_matrix <- as.matrix(df_filtered_80 %>% select(-Metabolite.name, -Average.Rt.min.))
+# Perform TIC normalization using the method = "sum"
+norm_TIC <- normalization(df_zero_imputed %>% select(-Metabolite.name, -Average.Rt.min.), method = "sum")$newXtrain
 
-# Apply VSN normalization
-vsn_fit <- vsn2(data_matrix)
-
-# Extract normalized data
-normalized_data <- as.data.frame(exprs(vsn_fit))
-
-# Add metadata columns back
-df_normalized <- cbind(
-  df_filtered_80 %>% select(Metabolite.name, Average.Rt.min.),
-  normalized_data
+# Combine normalized data with metadata
+df_TIC_normalized <- cbind(
+  df_zero_imputed %>% select(Metabolite.name, Average.Rt.min.),
+  as.data.frame(norm_TIC)
 )
 
-# Extract normalized data for imputation
-numeric_data <- df_normalized %>% select(-Metabolite.name, -Average.Rt.min.)
+# Verify the sums of each sample
+tic_after <- colSums(df_TIC_normalized %>% select(-Metabolite.name, -Average.Rt.min.))
+print("TIC values after normalization (should be ~1):")
+print(tic_after)
 
-# Perform imputation using missForest
-imputed_result <- missForest(as.data.frame(numeric_data))
+# Check for NAs
+print(paste("Number of NA values in Normalized data:", sum(is.na(norm_TIC) == TRUE)))
 
-# Extract the imputed data
-imputed_data <- as.data.frame(imputed_result$ximp)
 
-# Combine imputed data with metadata
-df_imputed <- cbind(
-  df_normalized %>% select(Metabolite.name, Average.Rt.min.),
-  imputed_data
-)
+df_normalized <- df_TIC_normalized
 
-################################
+# Check for any negative values across numeric columns
+any_negative <- any(df_normalized  %>% 
+                      select(where(is.numeric)) %>% 
+                      unlist() < 0, na.rm = TRUE)
+
+# Print result
+if (any_negative) {
+  print("There are negative values in the dataframe.")
+} else {
+  print("No negative values found in the dataframe.")
+}
+
+
+################################################################################
 # visualization
 # Prepare data for boxplot / Log2
-# Prepare data for plotting (before normalization)
+# Prepare data for plotting (before imputation)
 df_long_before <- df_filtered_80 %>%
   pivot_longer(cols = -c(Metabolite.name, Average.Rt.min.), names_to = "Sample", values_to = "Intensity") %>%
-  mutate(Stage = "Before Normalization", Log2_Intensity = log2(Intensity + 1))  # Add log2 transformation
+  mutate(Stage = "Before Imputation", Log2_Intensity = log2(Intensity + 1))  # Add log2 transformation
 
-# Prepare data for plotting (after normalization)
-df_long_after_norm <- df_normalized %>%negati
-  pivot_longer(cols = -c(Metabolite.name, Average.Rt.min.), names_to = "Sample", values_to = "Intensity") %>%
-  mutate(Stage = "After Normalization", Log2_Intensity = log2(Intensity + 1))  # Add log2 transformation
 
 # Prepare data for plotting (after imputation)
-df_long_after_impute <- df_imputed %>%
+df_long_after_impute <- df_zero_imputed %>%
   pivot_longer(cols = -c(Metabolite.name, Average.Rt.min.), names_to = "Sample", values_to = "Intensity") %>%
   mutate(Stage = "After Imputation", Log2_Intensity = log2(Intensity + 1))  # Add log2 transformation
 
+# Prepare data for plotting (after normalization)
+df_long_after_norm <- df_normalized %>%
+  pivot_longer(cols = -c(Metabolite.name, Average.Rt.min.), names_to = "Sample", values_to = "Intensity") %>%
+  mutate(Stage = "After Normalization", Log2_Intensity = log2(Intensity + 1))  # Add log2 transformation
 
 
-# Boxplot for before normalization
+# Boxplot for before imputation
 plot_before <- ggplot(df_long_before, aes(x = Sample, y = Log2_Intensity)) +
   geom_boxplot(outlier.alpha = 0.5, fill = "lightblue") +
-  labs(title = "Before Normalization", x = "Samples", y = "Log2(Intensity)") +
-  theme_minimal() +
-  theme(
-    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)  # Rotate x-axis labels
-  )
-
-# Boxplot for after normalization
-plot_after_norm <- ggplot(df_long_after_norm, aes(x = Sample, y = Log2_Intensity)) +
-  geom_boxplot(outlier.alpha = 0.5, fill = "lightgreen") +
-  labs(title = "After Normalization", x = "Samples", y = "Log2(Intensity)") +
+  labs(title = "Before Imputation", x = "Samples", y = "Log2(Intensity)") +
   theme_minimal() +
   theme(
     axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)  # Rotate x-axis labels
@@ -514,136 +496,207 @@ plot_after_impute <- ggplot(df_long_after_impute, aes(x = Sample, y = Log2_Inten
     axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)  # Rotate x-axis labels
   )
 
+# Boxplot for after normalization
+plot_after_norm <- ggplot(df_long_after_norm, aes(x = Sample, y = Log2_Intensity)) +
+  geom_boxplot(outlier.alpha = 0.5, fill = "lightgreen") +
+  labs(title = "After Normalization", x = "Samples", y = "Log2(Intensity)") +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)  # Rotate x-axis labels
+  )
+
 # Combine the three plots using patchwork
-combined_plot <- plot_before + plot_after_norm + plot_after_impute +
+combined_plot <- plot_before +plot_after_impute + plot_after_norm +
   plot_layout(ncol = 1) & theme(legend.position = "none")
 
 # Display the combined plot
 print(combined_plot)
 
 
-##############################
+################################################################################
+## Scaling
+
+# Select numeric data (exclude metadata)
+df_scaled <- df_normalized %>%
+  select(-Metabolite.name, -Average.Rt.min.) %>% 
+  scale() %>%
+  as.data.frame()
+
+# Combine scaled data with metadata
+df_scaled <- cbind(
+  df_normalized %>% select(Metabolite.name, Average.Rt.min.),
+  df_scaled
+)
+
+# Check scaling results
+summary(df_scaled %>% select(-Metabolite.name, -Average.Rt.min.))
+
+################################################################################
 ## PCA
 
-# Prepare numeric data for PCA (exclude metadata)
-pca_data <- df_imputed %>%
+# Prepare data for PCA (exclude metadata)
+pca_data <- df_scaled %>%
   select(-Metabolite.name, -Average.Rt.min.) %>%
   t() %>%
   as.data.frame()
 
-# Extract group names by splitting sample names at "_"
-rownames(pca_data) <- colnames(df_imputed %>% select(-Metabolite.name, -Average.Rt.min.))
-pca_data$Group <- sapply(rownames(pca_data), function(x) strsplit(x, "_")[[1]][1])
+# Assign rownames to the PCA data
+rownames(pca_data) <- colnames(df_normalized %>% select(-Metabolite.name, -Average.Rt.min.))
 
-# Standardize the data
-pca_data_scaled <- scale(pca_data[, -ncol(pca_data)])  # Exclude 'Group' column
-
-# Perform PCA
-pca_result <- prcomp(pca_data_scaled, center = TRUE, scale. = TRUE)
+# Perform PCA on scaled data
+pca_result <- prcomp(pca_data, center = FALSE, scale. = FALSE)
 
 # Create a data frame for plotting PCA results
 pca_plot_data <- as.data.frame(pca_result$x[, 1:2])  # Extract PC1 and PC2
-pca_plot_data$Group <- pca_data$Group  # Add group information
-pca_plot_data$Sample <- rownames(pca_data)  # Add sample names
+pca_plot_data$Group <- sapply(rownames(pca_data), function(x) strsplit(x, "_")[[1]][1])
+pca_plot_data$Sample <- rownames(pca_data)
 
+# Predefined solid colors for 9 groups
+solid_colors <- c(
+  "#1F77B4", "#FF7F0E", "#2CA02C", "#D62728", "#9467BD",
+  "#8C564B", "#E377C2", "#7F7F7F", "#BCBD22"
+)
 
-library(viridis)
+# Dynamically map colors to groups
+group_colors <- setNames(solid_colors, unique(pca_plot_data$Group))
 
-# Dynamically create a larger palette using viridis
-num_groups <- length(unique(pca_plot_data$Group))  # Count unique groups
-darker_colors <- viridis(num_groups, option = "D")  # Generate dark colors using the "D" viridis option
+# Step 1: Calculate variance explained by each PC
+explained_variance <- pca_result$sdev^2 / sum(pca_result$sdev^2)
+pc1_var <- round(explained_variance[1] * 100, 2)  # PC1 percentage
+pc2_var <- round(explained_variance[2] * 100, 2)  # PC2 percentage
 
-ggplot(pca_plot_data, aes(x = PC1, y = PC2, color = Group, label = Sample)) +
-  geom_point(size = 4, alpha = 0.9) +
-  geom_text(vjust = -1, size = 3) +
-  scale_color_manual(values = darker_colors) +  # Use dynamically generated darker colors
+# Step 2: Create the PCA plot with PC values in axis labels
+
+pca_plot <- ggplot(pca_plot_data, aes(x = PC1, y = PC2, color = Group, label = Sample)) +
+  geom_point(size = 4) +
+  geom_text_repel(size = 3, max.overlaps = 20, box.padding = 0.5, point.padding = 0.5) +
+  scale_color_manual(values = group_colors) +
   labs(
-    title = "PCA Plot with Grouped Samples (Dynamic Dark Colors)",
-    x = "Principal Component 1",
-    y = "Principal Component 2",
+    title = "PCA Plot with Percent Variance Explained",
+    x = paste0("Principal Component 1 (", pc1_var, "%)"),
+    y = paste0("Principal Component 2 (", pc2_var, "%)"),
     color = "Group"
   ) +
   theme_minimal() +
   theme(
     legend.position = "right",
     legend.text = element_text(size = 10),
-    legend.title = element_text(size = 12)
+    legend.title = element_text(size = 12),
+    plot.title = element_text(hjust = 0.5)
   )
 
+# Print the PCA plot
+print(pca_plot)
 
-#######################################################
+# Save the PCA plot as PDF and JPEG
+ggsave("PCA_Plot_Custom_Colors.pdf", plot = pca_plot, device = "pdf", width = 10, height = 8, dpi = 300)
+ggsave("PCA_Plot_Custom_Colors.jpeg", plot = pca_plot, device = "jpeg", width = 10, height = 8, dpi = 300)
+
+
+################################################################################
+## Heat Map
+
+# Extract numeric data for heatmap
+heatmap_data <- df_scaled %>% select(-Metabolite.name, -Average.Rt.min.) %>% as.matrix()
+
+color_palette <- colorRampPalette(c( "#A6CEE3" , "#33A02C", "#E31A1C"))(50)
+
+pheatmap(
+  heatmap_data,
+  cluster_rows = TRUE,    # Perform hierarchical clustering on rows (metabolites).
+  cluster_cols = TRUE,    # Perform hierarchical clustering on columns (samples).
+  color = color_palette,  # Apply the defined color palette.
+  main = "Heatmap of Scaled Data",  # Title of the heatmap.
+  show_rownames = FALSE,  # Optional: Hide row names (metabolites) to improve visualization.
+  show_colnames = TRUE    # Optional: Show column names (sample names).
+)
+
+
+
+################################################################################
 # Summarize multiple copies of metabolites coming from different libraries
 
 # Step 1: Create a new column 'Metabolite.name.mod' by extracting text before the first ';'
-df_imputed <- df_imputed %>%
+df_scaled_v2 <- df_scaled %>%
   mutate(Metabolite.name.mod = str_extract(Metabolite.name, "^[^;]+"))
 
 # Step 2: Group by 'Metabolite.name.mod' and calculate the average for all sample columns
-df_averaged <- df_imputed %>%
+df_scaled_v2_averaged <- df_scaled_v2 %>%
   group_by(Metabolite.name.mod) %>%
   summarise(across(where(is.numeric), mean, na.rm = TRUE)) %>%
   ungroup()
 
-# Step 2: Group by 'Metabolite.name.mod' and calculate the average for all sample columns
-df_averaged <- df_imputed %>%
-  group_by(Metabolite.name.mod) %>%
-  summarise(across(where(is.numeric), ~mean(.x, na.rm = TRUE))) %>%
-  ungroup()
+
+## Heat Map
+
+# Extract numeric data for heatmap
+heatmap_data_v2 <- df_scaled_v2_averaged %>% select(-Metabolite.name.mod, -Average.Rt.min.) %>% as.matrix()
+
+color_palette <- colorRampPalette(c( "#A6CEE3" , "#33A02C", "#E31A1C"))(50)
+
+pheatmap(
+  heatmap_data_v2,
+  cluster_rows = TRUE,    # Perform hierarchical clustering on rows (metabolites).
+  cluster_cols = TRUE,    # Perform hierarchical clustering on columns (samples).
+  color = color_palette,  # Apply the defined color palette.
+  main = "Heatmap of Scaled Data",  # Title of the heatmap.
+  show_rownames = FALSE,  # Optional: Hide row names (metabolites) to improve visualization.
+  show_colnames = TRUE    # Optional: Show column names (sample names).
+)
 
 
 
-
+################################################################################
 # Find Top metabolites
 
+# Summarize multiple copies of metabolites coming from different libraries
 
-# Step 1: Find the maximum value across all sample columns for each metabolite
-df_highest <- df_averaged %>%
-  rowwise() %>%
-  mutate(Max_Intensity = max(c_across(where(is.numeric)), na.rm = TRUE)) %>%
+# Step 1: Create a new column 'Metabolite.name.mod' by extracting text before the first ';'
+df_normalized_v2 <- df_normalized %>%
+  mutate(Metabolite.name.mod = str_extract(Metabolite.name, "^[^;]+"))
+
+# Step 2: Group by 'Metabolite.name.mod' and calculate the average for all sample columns
+df_normalized_v2_averaged <- df_normalized_v2 %>%
+  group_by(Metabolite.name.mod) %>%
+  summarise(across(where(is.numeric), mean, na.rm = TRUE)) %>%
   ungroup()
 
-# Step 2: Arrange metabolites by the maximum intensity value in descending order
-df_highest_sorted <- df_highest %>%
-  arrange(desc(Max_Intensity))
 
-# Step 3: Select the top metabolites (e.g., top 10)
-top_metabolites <- df_highest_sorted %>%
-  select(Metabolite.name.mod, Max_Intensity) %>%
-  head(10)
+# Calculate the Average Intensity Across All Samples
 
-# Print the top metabolites
-print(top_metabolites)
+# Exclude metadata columns
+metabolite_data <- df_normalized_v2_averaged %>% 
+  select(-Metabolite.name.mod, -Average.Rt.min.)
 
 
-# Exclude metadata columns and calculate row-wise maximum intensity
-metabolite_max <- df_imputed %>%
-  rowwise() %>%
-  mutate(Max_Intensity = max(c_across(-c(Metabolite.name, Average.Rt.min.)), na.rm = TRUE)) %>%
-  ungroup()
+df_normalized_v2_averaged <- df_normalized_v2_averaged %>% 
+  mutate(Median_Intensity = apply(metabolite_data, 1, median, na.rm = TRUE))
 
-# Select the top 10 metabolites with the highest intensities
-top_metabolites <- metabolite_max %>%
-  arrange(desc(Max_Intensity)) %>%
-  select(Metabolite.name, Max_Intensity) %>%
-  head(10)
+# Sort and select the top metabolites by median intensity
+highest_metabolites <- df_normalized_v2_averaged %>%
+  arrange(desc(Median_Intensity)) %>%
+  select(Metabolite.name.mod, Median_Intensity)
 
-# Print the top metabolites
-print(top_metabolites)
+# Print the top metabolites by median intensity
+print(highest_metabolites)
 
-# Optional: Visualize the top metabolites
-ggplot(top_metabolites, aes(x = reorder(Metabolite.name, -Max_Intensity), y = Max_Intensity)) +
-  geom_bar(stat = "identity", fill = "steelblue") +
-  labs(title = "Top 10 Metabolites by Maximum Intensity",
-       x = "Metabolite Name",
-       y = "Max Intensity") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+write.csv(df_normalized_v2_averaged, "df_normalized_v2_averaged.csv")
+
+
+################################################################################
 
 
 
 
 
+################################################################################
 
 
+
+
+
+################################################################################
 
 
 
