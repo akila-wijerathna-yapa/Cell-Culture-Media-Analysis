@@ -5,7 +5,7 @@ library(tidyverse)
 library(pheatmap)
 # library(vsn)
 library(patchwork)
-# library(naniar)
+library(naniar)
 # library(simputation)
 # library(missForest)
 library(KODAMA)
@@ -170,61 +170,61 @@ ggplot(missing_percentage, aes(x = Sample, y = Missing_Percentage)) +
        y = "Missing Value Percentage (%)")
 
 
-################################################################################
-# Step 1: Identify sample columns and separate group names from replicate numbers
-
-# Define the sample columns (exclude metadata columns like "Average.Rt.min." and "Metabolite.name")
-
-sample_mv_columns <- names(df_run_selected)[!(names(df_run_selected) %in% c("Average.Rt.min.", "Metabolite.name", "Blank_1", "Blank_2", "Blank_3", "Blank_4", "Pool_1", "Pool_2"))]
-
-# Convert the data to long format to make it easier to work with groups and replicates
-
-df_mv_handle_long <- df_run_selected %>%
-  pivot_longer(cols = all_of(sample_mv_columns), 
-               names_to = "Sample", 
-               values_to = "Area") %>%
-  mutate(Group = sub("_\\d+$", "", Sample),       # Extract the base sample group name (everything before the last underscore and digit)
-         Replicate = as.numeric(sub(".*_", "", Sample))  # Extract replicate number (the last number after the underscore)
-  )
-
-# Step 2: Count the non-missing values in each group for each metabolite
-
-# Group by metabolite and group, and count non-missing values in each group
-
-df_group_counts <- df_mv_handle_long %>%
-  group_by(Metabolite.name, Group) %>%
-  summarise(NonMissingCount = sum(!is.na(Area)), .groups = "drop")
-
-# Step 3: Filter metabolites that meet the threshold (at least 2 non-missing values in any group)
-
-# Find metabolites with at least 2 replicates detected in any group
-
-metabolites_to_keep <- df_group_counts %>%
-  filter(NonMissingCount >= 2) %>%
-  pull(Metabolite.name) %>%
-  unique()  # Unique list of metabolites that meet the criteria
-
-# Step 4: Filter the original df_run_selected based on the metabolites_to_keep list
-
-df_filtered <- df_run_selected %>%
-  filter(Metabolite.name %in% metabolites_to_keep)
-
-
-# Step 5: Count the number of identified metabolites (non-missing values) per sample
-# Select sample columns and count non-NA values per column
-
-metabolite_counts <- df_filtered %>%
-  select(-Average.Rt.min., -Metabolite.name) %>%
-  summarise(across(everything(), ~ sum(!is.na(.)))) %>%
-  pivot_longer(cols = everything(), names_to = "Sample", values_to = "Count")
-
-# Step 6: Plot a bar plot for the number of identified metabolites per sample
-
-ggplot(metabolite_counts, aes(x = Sample, y = Count)) +
-  geom_bar(stat = "identity", fill = "skyblue") +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
-  labs(title = "Number of Identified Metabolites per Sample", x = "Sample", y = "Count of Identified Metabolites")
-
+# ################################################################################
+# # Step 1: Identify sample columns and separate group names from replicate numbers
+# 
+# # Define the sample columns (exclude metadata columns like "Average.Rt.min." and "Metabolite.name")
+# 
+# sample_mv_columns <- names(df_run_selected)[!(names(df_run_selected) %in% c("Average.Rt.min.", "Metabolite.name", "Blank_1", "Blank_2", "Blank_3", "Blank_4", "Pool_1", "Pool_2"))]
+# 
+# # Convert the data to long format to make it easier to work with groups and replicates
+# 
+# df_mv_handle_long <- df_run_selected %>%
+#   pivot_longer(cols = all_of(sample_mv_columns), 
+#                names_to = "Sample", 
+#                values_to = "Area") %>%
+#   mutate(Group = sub("_\\d+$", "", Sample),       # Extract the base sample group name (everything before the last underscore and digit)
+#          Replicate = as.numeric(sub(".*_", "", Sample))  # Extract replicate number (the last number after the underscore)
+#   )
+# 
+# # Step 2: Count the non-missing values in each group for each metabolite
+# 
+# # Group by metabolite and group, and count non-missing values in each group
+# 
+# df_group_counts <- df_mv_handle_long %>%
+#   group_by(Metabolite.name, Group) %>%
+#   summarise(NonMissingCount = sum(!is.na(Area)), .groups = "drop")
+# 
+# # Step 3: Filter metabolites that meet the threshold (at least 2 non-missing values in any group)
+# 
+# # Find metabolites with at least 2 replicates detected in any group
+# 
+# metabolites_to_keep <- df_group_counts %>%
+#   filter(NonMissingCount >= 2) %>%
+#   pull(Metabolite.name) %>%
+#   unique()  # Unique list of metabolites that meet the criteria
+# 
+# # Step 4: Filter the original df_run_selected based on the metabolites_to_keep list
+# 
+# df_filtered <- df_run_selected %>%
+#   filter(Metabolite.name %in% metabolites_to_keep)
+# 
+# 
+# # Step 5: Count the number of identified metabolites (non-missing values) per sample
+# # Select sample columns and count non-NA values per column
+# 
+# metabolite_counts <- df_filtered %>%
+#   select(-Average.Rt.min., -Metabolite.name) %>%
+#   summarise(across(everything(), ~ sum(!is.na(.)))) %>%
+#   pivot_longer(cols = everything(), names_to = "Sample", values_to = "Count")
+# 
+# # Step 6: Plot a bar plot for the number of identified metabolites per sample
+# 
+# ggplot(metabolite_counts, aes(x = Sample, y = Count)) +
+#   geom_bar(stat = "identity", fill = "skyblue") +
+#   theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+#   labs(title = "Number of Identified Metabolites per Sample", x = "Sample", y = "Count of Identified Metabolites")
+# 
 
 
 # missing value visualization
@@ -268,14 +268,14 @@ vis_miss(df_temp, cluster = TRUE)  # Visualize clustered missing values
 gg_miss_upset(df_temp)
 
 
-# Plot missingness percentages by groups
-ggplot(missing_summary, aes(x = Sample, y = Missing_Percentage, fill = Type)) +
-  geom_bar(stat = "identity", position = "dodge") +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
-  labs(title = "Missingness by Group and Sample",
-       x = "Sample Names",
-       y = "Missing Value Percentage (%)")
-
+# # Plot missingness percentages by groups
+# ggplot(missing_summary, aes(x = Sample, y = Missing_Percentage, fill = Type)) +
+#   geom_bar(stat = "identity", position = "dodge") +
+#   theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+#   labs(title = "Missingness by Group and Sample",
+#        x = "Sample Names",
+#        y = "Missing Value Percentage (%)")
+# 
 
 
 # Count the occurrences of each type of "missing" value in df_run_selected
@@ -686,14 +686,96 @@ write.csv(df_normalized_v2_averaged, "df_normalized_v2_averaged.csv")
 
 ################################################################################
 
+#  find the top metabolites for each group
 
+# Step 1: Extract group names from sample columns
+sample_columns <- colnames(df_normalized_v2_averaged)[3:(ncol(df_normalized_v2_averaged) - 1)] # Exclude metadata columns
+group_names <- sapply(sample_columns, function(x) strsplit(x, "_")[[1]][1])
 
+# Step 2: Rename columns with group information
+colnames(df_normalized_v2_averaged)[3:(ncol(df_normalized_v2_averaged) - 1)] <- group_names
+
+# Step 3: Reshape the dataframe to long format
+df_normalized_v2_averaged_long <- df_normalized_v2_averaged %>%
+  pivot_longer(
+    cols = -c(Metabolite.name.mod, Average.Rt.min., Median_Intensity), 
+    names_to = "Group", 
+    values_to = "Intensity"
+  )
+
+# Step 4: Group by Metabolite.name.mod and Group, calculate mean intensity
+group_summary <- df_normalized_v2_averaged_long %>%
+  group_by(Group, Metabolite.name.mod) %>%
+  summarise(Mean_Intensity = mean(Intensity, na.rm = TRUE), .groups = "drop")
+
+# Step 5: For each group, find the top 25 metabolites
+top_25_metabolites <- group_summary %>%
+  group_by(Group) %>%
+  slice_max(order_by = Mean_Intensity, n = 50) %>%
+  arrange(Group, desc(Mean_Intensity))
+
+# Step 6: View results
+print(top_25_metabolites)
+
+# Optional: Save the results to a CSV file
+write.csv(top_25_metabolites, "Top_25_Metabolites_Per_Group.csv", row.names = FALSE)
 
 
 ################################################################################
 
+# Create a presence/absence matrix for metabolites across groups, dropping Mean_Intensity
+presence_matrix <- top_25_metabolites %>%
+  select(Group, Metabolite.name.mod) %>%  # Only keep the relevant columns
+  mutate(Presence = 1) %>%  # Add a column for presence
+  pivot_wider(
+    names_from = Group,  # Groups as columns
+    values_from = Presence,  # Use presence/absence
+    values_fill = 0  # Fill missing values with 0
+  )
+
+# Check the resulting matrix
+print(presence_matrix)
 
 
+# Convert to a matrix for visualization
+presence_matrix_matrix <- presence_matrix %>%
+  select(-Metabolite.name.mod) %>%
+  as.matrix()
+rownames(presence_matrix_matrix) <- presence_matrix$Metabolite.name.mod
+
+
+
+library(ComplexUpset)
+
+# Prepare data for UpSet plot
+presence_matrix_for_upset <- presence_matrix %>%
+  pivot_longer(-Metabolite.name.mod, names_to = "Group", values_to = "Presence") %>%
+  filter(Presence == 1) %>%
+  mutate(Value = TRUE) %>%
+  select(-Presence) %>%
+  pivot_wider(names_from = Group, values_from = Value, values_fill = FALSE)
+
+# Plot the UpSet
+upset(
+  presence_matrix_for_upset,
+  colnames(presence_matrix_for_upset)[-1],
+  name = "Metabolite Groups",
+  base_annotations = list(
+    'Intersection size' = intersection_size(counts = TRUE)
+  )
+)
+
+
+# Visualize the presence/absence matrix using a heatmap
+pheatmap(
+  presence_matrix_matrix,
+  cluster_rows = TRUE,  # Cluster metabolites
+  cluster_cols = TRUE,  # Cluster groups
+  color = colorRampPalette(c("white", "darkred"))(50),
+  main = "Presence of Top 25 Metabolites Across Groups",
+  show_rownames = FALSE,  # Hide row names
+  show_colnames = TRUE    # Show column (group) names
+)
 
 
 ################################################################################

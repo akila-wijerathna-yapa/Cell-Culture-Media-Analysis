@@ -60,3 +60,33 @@ pheatmap(
   show_colnames = TRUE
 )
 
+################################################################################
+
+# Extract the column names of the sample data
+sample_names <- colnames(df_normalized %>% select(-Metabolite.name, -Average.Rt.min.))
+
+# Extract group names (everything before the first underscore)
+group_names <- sapply(sample_names, function(x) strsplit(x, "_")[[1]][1])
+
+# Count the number of unique groups
+num_groups <- length(unique(group_names))
+
+# Print unique groups and their count
+unique_groups <- unique(group_names)
+print(paste("Number of groups:", num_groups))
+print("Groups:")
+print(unique_groups)
+
+################################################################################
+
+
+################################################################################
+
+
+################################################################################
+
+
+################################################################################
+
+
+################################################################################
