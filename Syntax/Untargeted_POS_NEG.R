@@ -1,4 +1,7 @@
 ################################################################################
+# Positive
+################################################################################
+
 #Libraries Loading ----
 
 library(tidyverse)
@@ -111,43 +114,71 @@ ggplot(df_pos_run_selected_long, aes(x = Samples, y = log(Area))) +
 
 
 ### PCA ----
-# 1. Prepare data for PCA
-# Select only the columns representing samples and exclude metadata columns
-
-df_pos_pca_data <- df_pos_run_selected %>%
-  select(-Average.Rt.min., -Adduct.type, -Metabolite.name) %>%
-  t() %>%
-  as.data.frame()
-
 # Standardize the data (mean=0, variance=1) for PCA
-
 df_pos_pca_data_scaled <- scale(df_pos_pca_data)
 
-# 2. Perform PCA
-
+# Perform PCA
 pca_pos_result <- prcomp(df_pos_pca_data_scaled, center = TRUE, scale. = TRUE)
 
-# 3. Extract sample names and group by ignoring replicate numbers
+# Calculate variance explained by each principal component
+explained_variance <- pca_pos_result$sdev^2 / sum(pca_pos_result$sdev^2)
+pc1_var <- round(explained_variance[1] * 100, 2)  # PC1 percentage
+pc2_var <- round(explained_variance[2] * 100, 2)  # PC2 percentage
 
+# Extract sample names and group by ignoring replicate numbers
 sample_names <- rownames(df_pos_pca_data)
 group_names <- str_extract(sample_names, "^[^_]+")  # Extract the part before "_"
 
-# 4. Create a data frame with PCA results and group labels
-
+# Create a data frame with PCA results and group labels
 pca_pos_data <- data.frame(Sample = sample_names, 
                            Group = group_names,
                            PC1 = pca_pos_result$x[,1], 
                            PC2 = pca_pos_result$x[,2])
 
-# 5. Plot the PCA results with colors based on sample groups
+# Define custom colors
+solid_colors <- c(
+                  "#7F7F7F",
+                  "#DBDB8D" ,
+                  "#1F77B4",
+                  "#FF7F0E",
+                  "#2CA02C",
+                  "#D62728",
+                  "#9467BD",
+                  "#8C564B",
+                  "#E377C2",
+                  "#7F7F7F",
+                  "#BCBD22" )
 
-ggplot(pca_pos_data, aes(x = PC1, y = PC2, color = Group, label = Sample)) +
+group_colors <- setNames(solid_colors, unique(pca_pos_data$Group))
+
+# Plot the PCA results with labels and custom colors
+pos_pca_plot <- ggplot(pca_pos_data, aes(x = PC1, y = PC2, color = Group, label = Sample)) +
   geom_point(size = 3) +
-  labs(title = "PCA Plot of Samples by Group", x = "Principal Component 1", y = "Principal Component 2") +
+  geom_text_repel(size = 3, max.overlaps = 20, box.padding = 0.5, point.padding = 0.5) +  # Add non-overlapping labels
+  scale_color_manual(values = group_colors) +  # Use custom colors
+  labs(
+    title = "PCA Plot of Samples by Group",
+    x = paste0("Principal Component 1 (", pc1_var, "%)"),
+    y = paste0("Principal Component 2 (", pc2_var, "%)"),
+    color = "Group"
+  ) +
   theme_minimal() +
-  theme(legend.position = "right")
+  theme(
+    legend.position = "right",
+    legend.text = element_text(size = 10),
+    legend.title = element_text(size = 12),
+    plot.title = element_text(hjust = 0.5)
+  )
 
+# Display the plot
+print(pos_pca_plot)
 
+# Save the plot as high-resolution JPEG and PDF
+ggsave("PCA_Plot_Pos.pdf", plot = pos_pca_plot, device = "pdf", width = 10, height = 8, dpi = 300)
+ggsave("PCA_Plot_Pos.jpeg", plot = pos_pca_plot, device = "jpeg", width = 10, height = 8, dpi = 300)
+
+# Print confirmation
+print("PCA plot saved successfully as PDF and JPEG.")
 
 ################################################################################
 ### Missing values ----
@@ -266,26 +297,6 @@ vis_miss(df_pos_temp, cluster = TRUE)  # Visualize clustered missing values
 
 # Upset plot for missing data combinations
 gg_miss_upset(df_pos_temp)
-
-# 
-# # Count the occurrences of each type of "missing" value in df_run_selected
-# pos_missing_summary <- df_pos_run_selected %>%
-#   summarise(
-#     Total_Zero = sum(across(where(is.numeric), ~ sum(. == 0, na.rm = TRUE))),
-#     Total_NA = sum(is.na(.)),
-#     Total_NaN = sum(across(where(is.numeric), ~ sum(is.nan(.))))
-#   )
-# 
-# # Display the summary of missing values
-# print(pos_missing_summary)
-# 
-# # Plot missingness percentages by groups
-# ggplot(pos_missing_summary, aes(x = Sample, y = Missing_Percentage, fill = Type)) +
-#   geom_bar(stat = "identity", position = "dodge") +
-#   theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
-#   labs(title = "Missingness by Group and Sample",
-#        x = "Sample Names",
-#        y = "Missing Value Percentage (%)")
 
 
 ################################################################################
@@ -459,7 +470,8 @@ if (any_negative) {
   print("No negative values found in the dataframe.")
 }
 
-
+################################################################################
+# Negative
 ################################################################################
 
 #---- Data Loading ----
@@ -558,42 +570,74 @@ ggplot(df_neg_run_selected_long, aes(x = Samples, y = log(Area))) +
 
 
 ### PCA ----
-# 1. Prepare data for PCA
-# Select only the columns representing samples and exclude metadata columns
-
-df_neg_pca_data <- df_neg_run_selected %>%
-  select(-Average.Rt.min., -Adduct.type, -Metabolite.name) %>%
-  t() %>%
-  as.data.frame()
-
 # Standardize the data (mean=0, variance=1) for PCA
-
 df_neg_pca_data_scaled <- scale(df_neg_pca_data)
 
-# 2. Perform PCA
-
+# Perform PCA
 pca_neg_result <- prcomp(df_neg_pca_data_scaled, center = TRUE, scale. = TRUE)
 
-# 3. Extract sample names and group by ignoring replicate numbers
+# Calculate variance explained by each principal component
+explained_variance <- pca_neg_result$sdev^2 / sum(pca_neg_result$sdev^2)
+pc1_var <- round(explained_variance[1] * 100, 2)  # PC1 percentage
+pc2_var <- round(explained_variance[2] * 100, 2)  # PC2 percentage
 
+# Extract sample names and group by ignoring replicate numbers
 sample_names <- rownames(df_neg_pca_data)
 group_names <- str_extract(sample_names, "^[^_]+")  # Extract the part before "_"
 
-# 4. Create a data frame with PCA results and group labels
-
+# Create a data frame with PCA results and group labels
 pca_neg_data <- data.frame(Sample = sample_names, 
                            Group = group_names,
                            PC1 = pca_neg_result$x[,1], 
                            PC2 = pca_neg_result$x[,2])
 
-# 5. Plot the PCA results with colors based on sample groups
+# Define custom colors
+solid_colors <- c(
+                  "#7F7F7F",
+                  "#DBDB8D" ,
+                  "#1F77B4",
+                  "#FF7F0E",
+                  "#2CA02C",
+                  "#D62728",
+                  "#9467BD",
+                  "#8C564B",
+                  "#E377C2",
+                  "#7F7F7F",
+                  "#BCBD22" )
+    
+group_colors <- setNames(solid_colors, unique(pca_neg_data$Group))
 
-ggplot(pca_neg_data, aes(x = PC1, y = PC2, color = Group, label = Sample)) +
+# Load ggrepel
+library(ggrepel)
+
+# Plot the PCA results with labels and custom colors
+neg_pca_plot <- ggplot(pca_neg_data, aes(x = PC1, y = PC2, color = Group, label = Sample)) +
   geom_point(size = 3) +
-  labs(title = "PCA Plot of Samples by Group", x = "Principal Component 1", y = "Principal Component 2") +
+  geom_text_repel(size = 3, max.overlaps = 20, box.padding = 0.5, point.padding = 0.5) +  # Add non-overlapping labels
+  scale_color_manual(values = group_colors) +  # Use custom colors
+  labs(
+    title = "PCA Plot of Samples by Group",
+    x = paste0("Principal Component 1 (", pc1_var, "%)"),
+    y = paste0("Principal Component 2 (", pc2_var, "%)"),
+    color = "Group"
+  ) +
   theme_minimal() +
-  theme(legend.position = "right")
+  theme(
+    legend.position = "right",
+    legend.text = element_text(size = 10),
+    legend.title = element_text(size = 12),
+    plot.title = element_text(hjust = 0.5)
+  )
 
+# Display the plot
+print(neg_pca_plot)
+
+# Save the plot as high-resolution JPEG and PDF
+ggsave("PCA_Plot_neg.pdf", plot = neg_pca_plot, device = "pdf", width = 10, height = 8, dpi = 300)
+ggsave("PCA_Plot_neg.jpeg", plot = neg_pca_plot, device = "jpeg", width = 10, height = 8, dpi = 300)
+
+# Print confirmation
+print("PCA plot saved successfully as PDF and JPEG.")
 
 ################################################################################
 ### Missing values ----
@@ -714,34 +758,12 @@ vis_miss(df_neg_temp, cluster = TRUE)  # Visualize clustered missing values
 gg_miss_upset(df_neg_temp)
 
 
-# # Count the occurrences of each type of "missing" value in df_run_selected
-# pos_missing_summary <- df_pos_run_selected %>%
-#   summarise(
-#     Total_Zero = sum(across(where(is.numeric), ~ sum(. == 0, na.rm = TRUE))),
-#     Total_NA = sum(is.na(.)),
-#     Total_NaN = sum(across(where(is.numeric), ~ sum(is.nan(.))))
-#   )
-# 
-# # Display the summary of missing values
-# print(pos_missing_summary)
-# 
-# # Plot missingness percentages by groups
-# ggplot(pos_missing_summary, aes(x = Sample, y = Missing_Percentage, fill = Type)) +
-#   geom_bar(stat = "identity", position = "dodge") +
-#   theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
-#   labs(title = "Missingness by Group and Sample",
-#        x = "Sample Names",
-#        y = "Missing Value Percentage (%)")
-
-
 ################################################################################
 # DDA; these are random observation; not everything was quantified
 ################################################################################
 
 # If blanks have high intensities for certain metabolites, subtracting them first avoids propagating those effects through normalization.
 # When using scaling techniques (e.g., Pareto scaling or mean centering) for multivariate analysis (e.g., PCA), it is usually better to subtract blanks first.
-
-
 
 # Step 1: Calculate Average Blank Values
 
@@ -905,7 +927,7 @@ if (any_negative) {
   print("No negative values found in the dataframe.")
 }
 
-################################################################################
+###############################################################################
 
 # Combine the two data frames
 df_combined <- rbind(df_neg_normalized, df_pos_normalized)
@@ -915,12 +937,293 @@ print(dim(df_combined))  # Check dimensions (rows and columns)
 head(df_combined)        # Preview the first few rows
 
 
+###############################################################################
+
+## Scaling
+
+# # Select numeric data (exclude metadata)
+# df_combined_scaled <- df_combined %>%
+#   select(-Metabolite.name, -Adduct.type, -Average.Rt.min.) %>% 
+#   scale() %>%
+#   as.data.frame()
+# 
+# # Combine scaled data with metadata
+# df_combined_scaled <- cbind(
+#   df_combined %>% select(Metabolite.name, Adduct.type, Average.Rt.min.),
+#   df_combined
+# )
+
+df_scaled_numeric <- df_combined %>%
+  select(-Metabolite.name, -Adduct.type, -Average.Rt.min.) %>% 
+  scale() %>%
+  as.data.frame()
+
+# Combine the scaled numeric data with metadata
+df_combined_scaled <- cbind(
+  df_combined %>% select(Metabolite.name, Adduct.type, Average.Rt.min.),
+  df_scaled_numeric
+)
+
+# Check the structure of the scaled data
+str(df_combined_scaled)
+
+# Check scaling results
+summary(df_combined_scaled %>% select(-Metabolite.name, -Adduct.type, -Average.Rt.min.))
+
 ################################################################################
-# Scaled
+## PCA
 
-# PCA
+# Prepare data for PCA (exclude metadata)
+df_combined_scaled_pca_data <- df_combined_scaled %>%
+  select(-Metabolite.name, -Adduct.type, -Average.Rt.min.) %>%
+  t() %>%
+  as.data.frame()
 
-# Heat Map
+# Assign rownames to the PCA data
+rownames(df_combined_scaled_pca_data) <- colnames(df_pos_normalized %>% select(-Metabolite.name,-Adduct.type, -Average.Rt.min.))
+
+# Perform PCA on scaled data
+df_combined_scaled_pca_data_result <- prcomp(df_combined_scaled_pca_data, center = FALSE, scale. = FALSE)
+
+# Create a data frame for plotting PCA results
+df_combined_scaled_pca_data <- as.data.frame(df_combined_scaled_pca_data_result$x[, 1:2])  # Extract PC1 and PC2
+df_combined_scaled_pca_data$Group <- sapply(rownames(df_combined_scaled_pca_data), function(x) strsplit(x, "_")[[1]][1])
+df_combined_scaled_pca_data$Sample <- rownames(df_combined_scaled_pca_data)
+
+# Predefined solid colors for 9 groups
+combined_solid_colors <- c(
+  "#1F77B4", "#FF7F0E", "#2CA02C", "#D62728", "#9467BD",
+  "#8C564B", "#E377C2", "#7F7F7F", "#BCBD22"
+)
+
+# Dynamically map colors to groups
+combined_group_colors <- setNames(solid_colors, unique(df_combined_scaled_pca_data$Group))
+
+# Step 1: Calculate variance explained by each PC
+combined_explained_variance <- df_combined_scaled_pca_data_result$sdev^2 / sum(df_combined_scaled_pca_data_result$sdev^2)
+combined_pc1_var <- round(explained_variance[1] * 100, 2)  # PC1 percentage
+combined_pc2_var <- round(explained_variance[2] * 100, 2)  # PC2 percentage
+
+# Step 2: Create the PCA plot with PC values in axis labels
+
+combined_pca_plot <- ggplot(df_combined_scaled_pca_data, aes(x = PC1, y = PC2, color = Group, label = Sample)) +
+  geom_point(size = 4) +
+  geom_text_repel(size = 3, max.overlaps = 20, box.padding = 0.5, point.padding = 0.5) +
+  scale_color_manual(values = combined_group_colors) +
+  labs(
+    title = "PCA Plot with Percent Variance Explained",
+    x = paste0("Principal Component 1 (", pc1_var, "%)"),
+    y = paste0("Principal Component 2 (", pc2_var, "%)"),
+    color = "Group"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "right",
+    legend.text = element_text(size = 10),
+    legend.title = element_text(size = 12),
+    plot.title = element_text(hjust = 0.5)
+  )
+
+# Print the PCA plot
+print(combined_pca_plot)
+
+# Save the PCA plot as PDF and JPEG
+ggsave("Combined_PCA_Plot_Custom_Colors.pdf", plot = combined_pca_plot, device = "pdf", width = 10, height = 8, dpi = 300)
+ggsave("Combined_PCA_Plot_Custom_Colors.jpeg", plot = combined_pca_plot, device = "jpeg", width = 10, height = 8, dpi = 300)
+
+
+################################################################################
+## Heat Map
+
+# Extract numeric data for heatmap
+combined_heatmap_data <- df_combined_scaled %>% select(-Metabolite.name,-Adduct.type, -Average.Rt.min.) %>% as.matrix()
+
+color_palette <- colorRampPalette(c( "#A6CEE3" , "#33A02C", "#E31A1C"))(50)
+
+pheatmap(
+  combined_heatmap_data,
+  cluster_rows = TRUE,    # Perform hierarchical clustering on rows (metabolites).
+  cluster_cols = TRUE,    # Perform hierarchical clustering on columns (samples).
+  color = color_palette,  # Apply the defined color palette.
+  main = "Heatmap of Scaled Data",  # Title of the heatmap.
+  show_rownames = FALSE,  # Optional: Hide row names (metabolites) to improve visualization.
+  show_colnames = TRUE    # Optional: Show column names (sample names).
+)
+
+
+
+################################################################################
+# Summarize multiple copies of metabolites coming from different libraries
+
+# Step 1: Create a new column 'Metabolite.name.mod' by extracting text before the first ';'
+df_combined_scaled_v2 <- df_combined_scaled %>%
+  mutate(Metabolite.name.mod = str_extract(Metabolite.name, "^[^;]+"))
+
+# Step 2: Group by 'Metabolite.name.mod' and calculate the average for all sample columns
+df_combined_scaled_v2_averaged <- df_combined_scaled_v2 %>%
+  group_by(Metabolite.name.mod) %>%
+  summarise(across(where(is.numeric), mean, na.rm = TRUE)) %>%
+  ungroup()
+
+
+## Heat Map
+
+# Extract numeric data for heatmap
+heatmap_data_v2 <- df_combined_scaled_v2_averaged %>% select(-Metabolite.name.mod, -Average.Rt.min.) %>% as.matrix()
+
+color_palette <- colorRampPalette(c( "#A6CEE3" , "#33A02C", "#E31A1C"))(50)
+
+pheatmap(
+  heatmap_data_v2,
+  cluster_rows = TRUE,    
+  cluster_cols = TRUE,    
+  color = color_palette,  
+  main = "Heatmap of Scaled Data",  
+  show_rownames = FALSE,  
+  show_colnames = TRUE)
+
+
+
+################################################################################
+# Find Top metabolites
+
+# Summarize multiple copies of metabolites coming from different libraries
+
+# Step 1: Create a new column 'Metabolite.name.mod' by extracting text before the first ';'
+df_combined_v2 <- df_combined %>%
+  mutate(Metabolite.name.mod = str_extract(Metabolite.name, "^[^;]+"))
+
+# Step 2: Group by 'Metabolite.name.mod' and calculate the average for all sample columns
+df_combined_v2_averaged <- df_combined_v2 %>%
+  group_by(Metabolite.name.mod) %>%
+  summarise(across(where(is.numeric), mean, na.rm = TRUE)) %>%
+  ungroup()
+
+
+# Calculate the Average Intensity Across All Samples
+
+# Exclude metadata columns
+metabolite_data <- df_combined_v2_averaged %>% 
+  select(-Metabolite.name.mod, -Average.Rt.min.)
+
+
+df_combined_v2_averaged <- df_combined_v2_averaged %>% 
+  mutate(Median_Intensity = apply(metabolite_data, 1, median, na.rm = TRUE))
+
+# Sort and select the top metabolites by median intensity
+highest_metabolites <- df_combined_v2_averaged %>%
+  arrange(desc(Median_Intensity)) %>%
+  select(Metabolite.name.mod, Median_Intensity)
+
+# Print the top metabolites by median intensity
+print(highest_metabolites)
+
+
+write.csv(df_combined_v2_averaged, "df_combined_v2_averaged.csv")
+
+
+################################################################################
+
+#  find the top metabolites for each group
+
+# Step 1: Extract group names from sample columns
+sample_columns <- colnames(df_combined_v2_averaged)[3:(ncol(df_combined_v2_averaged) - 1)] # Exclude metadata columns
+group_names <- sapply(sample_columns, function(x) strsplit(x, "_")[[1]][1])
+
+# Step 2: Rename columns with group information
+colnames(df_combined_v2_averaged)[3:(ncol(df_combined_v2_averaged) - 1)] <- group_names
+
+# Step 3: Reshape the dataframe to long format
+df_combined_v2_averaged_long <- df_combined_v2_averaged %>%
+  pivot_longer(
+    cols = -c(Metabolite.name.mod, Average.Rt.min., Median_Intensity), 
+    names_to = "Group", 
+    values_to = "Intensity"
+  )
+
+# Step 4: Group by Metabolite.name.mod and Group, calculate mean intensity
+group_summary <- df_combined_v2_averaged_long %>%
+  group_by(Group, Metabolite.name.mod) %>%
+  summarise(Mean_Intensity = mean(Intensity, na.rm = TRUE), .groups = "drop")
+
+# Step 5: For each group, find the top 25 metabolites
+top_25_metabolites <- group_summary %>%
+  group_by(Group) %>%
+  slice_max(order_by = Mean_Intensity, n = 50) %>%
+  arrange(Group, desc(Mean_Intensity))
+
+# Step 6: View results
+print(top_25_metabolites)
+
+# Optional: Save the results to a CSV file
+write.csv(top_25_metabolites, "Top_25_Metabolites_Per_Group.csv", row.names = FALSE)
+
+
+################################################################################
+
+# Create a presence/absence matrix for metabolites across groups, dropping Mean_Intensity
+presence_matrix <- top_25_metabolites %>%
+  select(Group, Metabolite.name.mod) %>%  # Only keep the relevant columns
+  mutate(Presence = 1) %>%  # Add a column for presence
+  pivot_wider(
+    names_from = Group,  # Groups as columns
+    values_from = Presence,  # Use presence/absence
+    values_fill = 0  # Fill missing values with 0
+  )
+
+# Check the resulting matrix
+print(presence_matrix)
+
+
+# Convert to a matrix for visualization
+presence_matrix_matrix <- presence_matrix %>%
+  select(-Metabolite.name.mod) %>%
+  as.matrix()
+rownames(presence_matrix_matrix) <- presence_matrix$Metabolite.name.mod
+
+
+
+library(ComplexUpset)
+
+# Prepare data for UpSet plot
+presence_matrix_for_upset <- presence_matrix %>%
+  pivot_longer(-Metabolite.name.mod, names_to = "Group", values_to = "Presence") %>%
+  filter(Presence == 1) %>%
+  mutate(Value = TRUE) %>%
+  select(-Presence) %>%
+  pivot_wider(names_from = Group, values_from = Value, values_fill = FALSE)
+
+# Plot the UpSet
+upset(
+  presence_matrix_for_upset,
+  colnames(presence_matrix_for_upset)[-1],
+  name = "Metabolite Groups",
+  base_annotations = list(
+    'Intersection size' = intersection_size(counts = TRUE)
+  )
+)
+
+
+# Visualize the presence/absence matrix using a heatmap
+pheatmap(
+  presence_matrix_matrix,
+  cluster_rows = TRUE,  # Cluster metabolites
+  cluster_cols = TRUE,  # Cluster groups
+  color = colorRampPalette(c("white", "darkred"))(50),
+  main = "Presence of Top 25 Metabolites Across Groups",
+  show_rownames = FALSE,  # Hide row names
+  show_colnames = TRUE    # Show column (group) names
+)
+
+
+################################################################################
+
+
+
+
+
+
+
 
 ################################################################################
 
