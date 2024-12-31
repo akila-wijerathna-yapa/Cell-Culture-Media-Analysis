@@ -1,5 +1,4 @@
-################################################################################
-# Positive
+################################################################################# Positive ion mode MS data
 ################################################################################
 
 #Libraries Loading ----
@@ -114,6 +113,13 @@ ggplot(df_pos_run_selected_long, aes(x = Samples, y = log(Area))) +
 
 
 ### PCA ----
+
+# Select only the columns representing samples and exclude metadata columns
+
+df_pos_pca_data <- df_pos_run_selected %>%
+  select(-Average.Rt.min., -Adduct.type, -Metabolite.name) %>%
+  t() %>%
+  as.data.frame()
 # Standardize the data (mean=0, variance=1) for PCA
 df_pos_pca_data_scaled <- scale(df_pos_pca_data)
 
@@ -471,7 +477,7 @@ if (any_negative) {
 }
 
 ################################################################################
-# Negative
+# Negative ion mode MS data
 ################################################################################
 
 #---- Data Loading ----
@@ -570,6 +576,13 @@ ggplot(df_neg_run_selected_long, aes(x = Samples, y = log(Area))) +
 
 
 ### PCA ----
+# Select only the columns representing samples and exclude metadata columns
+
+df_neg_pca_data <- df_neg_run_selected %>%
+  select(-Average.Rt.min., -Adduct.type, -Metabolite.name) %>%
+  t() %>%
+  as.data.frame()
+
 # Standardize the data (mean=0, variance=1) for PCA
 df_neg_pca_data_scaled <- scale(df_neg_pca_data)
 
@@ -606,9 +619,6 @@ solid_colors <- c(
                   "#BCBD22" )
     
 group_colors <- setNames(solid_colors, unique(pca_neg_data$Group))
-
-# Load ggrepel
-library(ggrepel)
 
 # Plot the PCA results with labels and custom colors
 neg_pca_plot <- ggplot(pca_neg_data, aes(x = PC1, y = PC2, color = Group, label = Sample)) +
@@ -778,14 +788,6 @@ df_neg_with_blank_avg <- df_neg_filtered %>%
 sample_columns <- setdiff(names(df_neg_with_blank_avg), 
                           c("Metabolite.name", "Adduct.type", "Average.Rt.min.", "Blank_1", "Pool_1", "Pool_2", "Average_Blank"))
 
-## Subtract blanks and replace negatives with NA or 0
-## Negative values can be replaced with NA to treat them as missing data for downstream analyses or with zero if they signify an absence of signal rather than an artifact.
-
-# # Subtract blanks and replace negatives with NA
-# df_blank_corrected <- df_with_blank_avg %>%
-#   mutate(across(all_of(sample_columns), ~ ifelse((. - Average_Blank) < 0, NA, . - Average_Blank))) %>%
-#   select(-starts_with("Blank_"), -starts_with("Pool_"), -Average_Blank)  # Drop Blank, Pool, and Average_Blank columns
-
 # Subtract blanks and replace negatives with zero
 df_neg_blank_corrected <- df_neg_with_blank_avg %>%
   mutate(across(all_of(sample_columns), ~ ifelse((. - Average_Blank) < 0, 0, . - Average_Blank))) %>%
@@ -936,22 +938,13 @@ df_combined <- rbind(df_neg_normalized, df_pos_normalized)
 print(dim(df_combined))  # Check dimensions (rows and columns)
 head(df_combined)        # Preview the first few rows
 
+write.csv(df_combined, "df_combined_POS_NEG.csv")
 
 ###############################################################################
 
 ## Scaling
 
-# # Select numeric data (exclude metadata)
-# df_combined_scaled <- df_combined %>%
-#   select(-Metabolite.name, -Adduct.type, -Average.Rt.min.) %>% 
-#   scale() %>%
-#   as.data.frame()
-# 
-# # Combine scaled data with metadata
-# df_combined_scaled <- cbind(
-#   df_combined %>% select(Metabolite.name, Adduct.type, Average.Rt.min.),
-#   df_combined
-# )
+# Select numeric data (exclude metadata)
 
 df_scaled_numeric <- df_combined %>%
   select(-Metabolite.name, -Adduct.type, -Average.Rt.min.) %>% 
@@ -1051,6 +1044,37 @@ pheatmap(
 )
 
 
+pdf_file <- "Heatmap_Scaled_Data.pdf"
+jpeg_file <- "Heatmap_Scaled_Data.jpeg"
+
+# Save as PDF
+pdf(file = pdf_file, width = 10, height = 8)  # Adjust width and height for desired size
+pheatmap(
+  combined_heatmap_data,
+  cluster_rows = TRUE,    # Perform hierarchical clustering on rows (metabolites).
+  cluster_cols = TRUE,    # Perform hierarchical clustering on columns (samples).
+  color = color_palette,  # Apply the defined color palette.
+  main = "Heatmap of Scaled Data",  # Title of the heatmap.
+  show_rownames = FALSE,  # Hide row names (metabolites).
+  show_colnames = TRUE    # Show column names (sample names).
+)
+dev.off()  # Close the PDF device
+
+# Save as JPEG
+jpeg(file = jpeg_file, width = 1200, height = 1000, res = 150)  # High resolution
+pheatmap(
+  combined_heatmap_data,
+  cluster_rows = TRUE,    # Perform hierarchical clustering on rows (metabolites).
+  cluster_cols = TRUE,    # Perform hierarchical clustering on columns (samples).
+  color = color_palette,  # Apply the defined color palette.
+  main = "Heatmap of Scaled Data",  # Title of the heatmap.
+  show_rownames = FALSE,  # Hide row names (metabolites).
+  show_colnames = TRUE    # Show column names (sample names).
+)
+dev.off()  # Close the JPEG device
+
+# Print confirmation
+cat("Heatmap saved as", pdf_file, "and", jpeg_file, "in the working directory.\n")
 
 ################################################################################
 # Summarize multiple copies of metabolites coming from different libraries
@@ -1071,8 +1095,13 @@ df_combined_scaled_v2_averaged <- df_combined_scaled_v2 %>%
 # Extract numeric data for heatmap
 heatmap_data_v2 <- df_combined_scaled_v2_averaged %>% select(-Metabolite.name.mod, -Average.Rt.min.) %>% as.matrix()
 
-color_palette <- colorRampPalette(c( "#A6CEE3" , "#33A02C", "#E31A1C"))(50)
+color_palette <- colorRampPalette(c( "#A6CEE3" , "#33A02C", "#E31A1C"))(2)
 
+pdf_file <- "Heatmap_combined_scaled_v2_averaged.pdf"
+jpeg_file <- "Heatmap_combined_scaled_v2_averaged.jpeg"
+
+# Save as PDF
+pdf(file = pdf_file, width = 10, height = 8)  # Adjust width and height for desired size
 pheatmap(
   heatmap_data_v2,
   cluster_rows = TRUE,    
@@ -1082,6 +1111,23 @@ pheatmap(
   show_rownames = FALSE,  
   show_colnames = TRUE)
 
+dev.off()  
+
+# Save as JPEG
+jpeg(file = jpeg_file, width = 1200, height = 1000, res = 150)  # High resolution
+pheatmap(
+  heatmap_data_v2,
+  cluster_rows = TRUE,    
+  cluster_cols = TRUE,    
+  color = color_palette,  
+  main = "Heatmap of Scaled Data",  
+  show_rownames = FALSE,  
+  show_colnames = TRUE)
+
+dev.off()  
+
+# Print confirmation
+cat("Heatmap saved as", pdf_file, "and", jpeg_file, "in the working directory.\n")
 
 
 ################################################################################
@@ -1123,110 +1169,163 @@ write.csv(df_combined_v2_averaged, "df_combined_v2_averaged.csv")
 
 
 ################################################################################
-
 #  find the top metabolites for each group
 
-# Step 1: Extract group names from sample columns
-sample_columns <- colnames(df_combined_v2_averaged)[3:(ncol(df_combined_v2_averaged) - 1)] # Exclude metadata columns
-group_names <- sapply(sample_columns, function(x) strsplit(x, "_")[[1]][1])
+df_combined_v3 <- df_combined %>%
+  mutate(Metabolite.name.mod = str_extract(Metabolite.name, "^[^;]+"))
 
-# Step 2: Rename columns with group information
-colnames(df_combined_v2_averaged)[3:(ncol(df_combined_v2_averaged) - 1)] <- group_names
+# Create a new DataFrame by dropping the specified columns and calculating the mean of rows grouped by "Metabolite.name.mod"
+df_combined_v3_Met_Avg <- df_combined_v3 %>%
+  select(-Metabolite.name, -Adduct.type, -Average.Rt.min.) %>% # Drop the specified columns
+  group_by(Metabolite.name.mod) %>% # Group by "Metabolite.name.mod"
+  summarise(across(everything(), mean, na.rm = TRUE)) %>% # Calculate the mean for each sample column
+  ungroup() # Remove grouping to get a clean DataFrame
 
-# Step 3: Reshape the dataframe to long format
-df_combined_v2_averaged_long <- df_combined_v2_averaged %>%
-  pivot_longer(
-    cols = -c(Metabolite.name.mod, Average.Rt.min., Median_Intensity), 
-    names_to = "Group", 
-    values_to = "Intensity"
+# View the resulting DataFrame
+head(df_combined_v3_Met_Avg)
+
+# Create a new data frame with the mean of each group
+df_combined_v3_sample_mean <- df_combined_v3_Met_Avg
+
+# Extract group names from sample columns
+sample_columns <- colnames(df_combined_v3_sample_mean)[-1] # Exclude the "Metabolite.name.mod" column
+group_names <- sapply(sample_columns, function(x) sub("_\\d+$", "", x)) # Remove replicate numbers (_n) to get group names
+
+# Calculate the mean for each group and add it as a new column
+for (group in unique(group_names)) {
+  # Get the columns corresponding to the current group
+  group_columns <- sample_columns[grepl(paste0("^", group, "_"), sample_columns)]
+  
+  # Calculate the mean of the group columns and add a new column to the data frame
+  df_combined_v3_sample_mean[[group]] <- rowMeans(
+    df_combined_v3_sample_mean[group_columns],
+    na.rm = TRUE
   )
+}
 
-# Step 4: Group by Metabolite.name.mod and Group, calculate mean intensity
-group_summary <- df_combined_v2_averaged_long %>%
-  group_by(Group, Metabolite.name.mod) %>%
-  summarise(Mean_Intensity = mean(Intensity, na.rm = TRUE), .groups = "drop")
+# View the resulting data frame
+head(df_combined_v3_sample_mean)
 
-# Step 5: For each group, find the top 25 metabolites
-top_25_metabolites <- group_summary %>%
-  group_by(Group) %>%
-  slice_max(order_by = Mean_Intensity, n = 50) %>%
-  arrange(Group, desc(Mean_Intensity))
 
-# Step 6: View results
-print(top_25_metabolites)
+################################################################################
+## Find the top 25 metabolites for each group
 
-# Optional: Save the results to a CSV file
-write.csv(top_25_metabolites, "Top_25_Metabolites_Per_Group.csv", row.names = FALSE)
+
+# 1. Find the top 25 metabolites for each group
+group_columns <- colnames(df_combined_v3_sample_mean)[30:38] # Extract group column names
+
+top_metabolites <- lapply(group_columns, function(group) {
+  df_combined_v3_sample_mean %>%
+    arrange(desc(.data[[group]])) %>% # Sort by the group column in descending order
+    slice_head(n = 25) %>% # Get the top 25 rows
+    pull(Metabolite.name.mod) # Extract the metabolite names
+})
+
+# Name the list elements by group
+names(top_metabolites) <- group_columns
+
+# 2. Create a unique list of all metabolites across all groups
+top_metabolite_list <- unique(unlist(top_metabolites))
+
+# 3. Create a new dataframe for these metabolites
+# Filter the original sample data for the selected metabolites
+df_top_metabolites_replicates <- df_combined_v3_Met_Avg %>%
+  filter(Metabolite.name.mod %in% top_metabolite_list)
+
+# View the resulting dataframes
+print("Top metabolites for each group:")
+print(top_metabolites)
+
+print("Final dataframe showcasing replicates behavior:")
+head(df_top_metabolites_replicates)
 
 
 ################################################################################
 
-# Create a presence/absence matrix for metabolites across groups, dropping Mean_Intensity
-presence_matrix <- top_25_metabolites %>%
-  select(Group, Metabolite.name.mod) %>%  # Only keep the relevant columns
-  mutate(Presence = 1) %>%  # Add a column for presence
-  pivot_wider(
-    names_from = Group,  # Groups as columns
-    values_from = Presence,  # Use presence/absence
-    values_fill = 0  # Fill missing values with 0
+
+
+# Define the group column names
+group_columns <- colnames(df_combined_v3_sample_mean)[30:38]
+
+# Create a list of top 25 metabolites for each group
+top_metabolites <- lapply(group_columns, function(group) {
+  df_combined_v3_sample_mean %>%
+    arrange(desc(.data[[group]])) %>% # Sort by the group column in descending order
+    slice_head(n = 50) %>% # Get the top 25 rows
+    pull(Metabolite.name.mod) # Extract the metabolite names
+})
+
+# Name the list elements by group
+names(top_metabolites) <- group_columns
+
+# Combine the list into a presence/absence dataframe
+top_metabolites_df <- tibble(Metabolite.name.mod = unique(unlist(top_metabolites)))
+
+# Create presence/absence columns for each group
+for (group in group_columns) {
+  top_metabolites_df[[group]] <- ifelse(
+    top_metabolites_df$Metabolite.name.mod %in% top_metabolites[[group]],
+    1,
+    0
   )
+}
 
-# Check the resulting matrix
-print(presence_matrix)
-
-
-# Convert to a matrix for visualization
-presence_matrix_matrix <- presence_matrix %>%
-  select(-Metabolite.name.mod) %>%
-  as.matrix()
-rownames(presence_matrix_matrix) <- presence_matrix$Metabolite.name.mod
-
-
-
-library(ComplexUpset)
-
-# Prepare data for UpSet plot
-presence_matrix_for_upset <- presence_matrix %>%
-  pivot_longer(-Metabolite.name.mod, names_to = "Group", values_to = "Presence") %>%
-  filter(Presence == 1) %>%
-  mutate(Value = TRUE) %>%
-  select(-Presence) %>%
-  pivot_wider(names_from = Group, values_from = Value, values_fill = FALSE)
-
-# Plot the UpSet
-upset(
-  presence_matrix_for_upset,
-  colnames(presence_matrix_for_upset)[-1],
-  name = "Metabolite Groups",
+# UpSet Plot using ComplexUpset
+ComplexUpset::upset(
+  top_metabolites_df,
+  group_columns,
+  name = "Top Metabolites by Group",
   base_annotations = list(
-    'Intersection size' = intersection_size(counts = TRUE)
-  )
+    'Intersection Size' = intersection_size(
+      counts = TRUE,
+      text = list(size = 4)
+    )
+  ),
+  set_sizes = upset_set_size(
+    geom = geom_bar(
+      width = 0.5, # Removed aes(fill = ...) to fix the issue
+      fill = "steelblue" # You can set a static fill color if needed
+    )
+  ),
+  width_ratio = 0.3
 )
 
+################################################################################
+# Find metabolites in each intersection
+intersection_list <- top_metabolites_df %>%
+  pivot_longer(cols = group_columns, names_to = "Group", values_to = "Presence") %>%
+  group_by(Metabolite.name.mod) %>%
+  summarise(Intersection = paste(Group[Presence == 1], collapse = ", ")) %>%
+  arrange(Intersection)
 
-# Visualize the presence/absence matrix using a heatmap
-pheatmap(
-  presence_matrix_matrix,
-  cluster_rows = TRUE,  # Cluster metabolites
-  cluster_cols = TRUE,  # Cluster groups
-  color = colorRampPalette(c("white", "darkred"))(50),
-  main = "Presence of Top 25 Metabolites Across Groups",
-  show_rownames = FALSE,  # Hide row names
-  show_colnames = TRUE    # Show column (group) names
-)
+# View the intersections
+print(intersection_list)
 
+# Find metabolites shared between specific groups
+shared_metabolites <- intersection_list %>%
+  filter(str_detect(Intersection, "HyPea-7404") & str_detect(Intersection, "HyPep-4601N"))
+
+# Find metabolites only in HyPea-7404
+only_in_HyPea_7404 <- top_metabolites_df %>%
+  filter(`HyPea-7404` == 1 & rowSums(select(., -Metabolite.name.mod, -`HyPea-7404`)) == 0)
+
+# View the result
+print(only_in_HyPea_7404)
+
+# Find metabolites only in HyPep-7504
+only_in_HyPep_7504 <- top_metabolites_df %>%
+  filter(`HyPep-7504` == 1 & rowSums(select(., -Metabolite.name.mod, -`HyPep-7504`)) == 0)
+
+# View the result
+print(only_in_HyPep_7504)
+
+# Find metabolites shared between HyPea-7404, HyPep-4601N, and HY-YEST-503
+specific_intersection <- intersection_list %>%
+  filter(Intersection == "HyPea-7404, HyPep-4601N, HY-YEST-503")
+
+# View specific intersection
+print(specific_intersection)
 
 ################################################################################
-
-
-
-
-
-
-
-
-################################################################################
-
-
 
 ################################################################################
